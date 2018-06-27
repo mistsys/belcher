@@ -7,7 +7,7 @@ import requests
 
 
 DEFAULT_BASE = 'http://localhost:8090/'
-PATHS = {  # {{{
+PATHS = {
     'config': "/burp/configuration",
     'history': "/burp/proxy/history",
     'issues': "/burp/scanner/issues",
@@ -21,7 +21,7 @@ PATHS = {  # {{{
     # '': "/burp/scanner/scans/passive",
     # '': "/burp/target/sitemap",
     # '': "/burp/versions" ,
-}  # }}}
+}
 
 
 class BurpClient:
@@ -128,7 +128,8 @@ if __name__ == '__main__':
 
     spider = subparsers.add_parser('spider', help='Subcommands for the Burp spider')
     spider.set_defaults(cmd='spider')  # stupid hack to keep a record of the subcommand used
-    # this can be changed to use choices and just positional args instead of flags
+
+    # all subcommands can be changed to use choices and positional args instead of flags (for some options)
     spider.add_argument('-u', '--url', help='Send a URL to the spider queue',
                         metavar='url', type=str, nargs='+')
     spider.add_argument('-s', '--status', help='Get the current spider status',
@@ -137,7 +138,7 @@ if __name__ == '__main__':
                         action='store_true')
 
     scan = subparsers.add_parser('scan', help='Subcommands for the Burp active scanner')
-    scan.set_defaults(cmd='scan')
+    scan.set_defaults(cmd='scan')  # stupid hack to keep a record of the subcommand used
     scan.add_argument('-u', '--url', help='Target URL',
                       metavar='url', type=str, nargs='?')
     scan.add_argument('-a', '--add-to-scope', help='Add the URL to the scope if it isn\'t in scope already',
@@ -148,12 +149,12 @@ if __name__ == '__main__':
                       action='store_true')
 
     report = subparsers.add_parser('report', help='Get the scan report')
-    report.set_defaults(cmd='report')
+    report.set_defaults(cmd='report')  # stupid hack to keep a record of the subcommand used
     report.add_argument('-o', '--output', help='Output file for report',
                         required=True, type=str)
 
     stop = subparsers.add_parser('stop', help='Stop the Burp daemon')
-    stop.set_defaults(cmd='stop')
+    stop.set_defaults(cmd='stop')  # stupid hack to keep a record of the subcommand used
 
     args = root_parser.parse_args()
     args_dict = vars(args)
