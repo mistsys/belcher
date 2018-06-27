@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import time
 import urllib.parse
 
 import requests
@@ -86,15 +87,28 @@ class BurpClient:
         return 'Started active scan on {}'.format(target)
 
     def scan_status(self):
+        '''Returns text and True/False for done/not done'''
         url = self._resource_url('scan-status')
         resp = requests.get(url)
         if not resp.ok:
-            return 'Failed to get status! Status {}, {}'.format(resp.status_code, resp.text)
+            return (
+                'Failed to get status! Status {}, {}'.format(resp.status_code, resp.text),
+                False
+            )
         try:
             data = resp.json()
-            return 'Scan percentage: {}'.format(data['scanPercentage'])
+            perc = data['scanPercentage']
+            return 'Scan percentage: {}'.format(perc), perc == 100
         except Exception:
-            return 'Failed to parse response data: {}'.format(resp.text)
+            return 'Failed to parse response data: {}'.format(resp.text), False
+
+    def report(self):
+        url = self._resource_url('report')
+        resp = requests.get(url)
+        if not resp.ok:
+            print('Failed to get status! Status {}, {}'.format(resp.status_code, resp.text))
+            return
+        return resp.text
 
     def stop(self):
         '''Stop Burp. Per the docs, this *fully stops* the burp process.'''
@@ -109,7 +123,7 @@ class BurpClient:
 if __name__ == '__main__':
     root_parser = argparse.ArgumentParser(description='CLI for Burp Rest API')
     root_parser.add_argument('-b', '--base', help='Base Burp daemon URL',
-                             metavar='url', type=str, default='')
+                             metavar='base', type=str, default='')
     subparsers = root_parser.add_subparsers()
 
     spider = subparsers.add_parser('spider', help='Subcommands for the Burp spider')
@@ -133,6 +147,11 @@ if __name__ == '__main__':
     scan.add_argument('-s', '--status', help='Get the current scanner status',
                       action='store_true')
 
+    report = subparsers.add_parser('report', help='Get the scan report')
+    report.set_defaults(cmd='report')
+    report.add_argument('-o', '--output', help='Output file for report',
+                        required=True, type=str)
+
     stop = subparsers.add_parser('stop', help='Stop the Burp daemon')
     stop.set_defaults(cmd='stop')
 
@@ -148,22 +167,33 @@ if __name__ == '__main__':
 
     if cmd == 'stop':
         print(client.stop())
-    if cmd == 'spider':
-        if args.status:
-            print(client.spider_status())
+    elif cmd == 'report':
+        with open(args.output, 'x') as f:
+            report = client.report()
+            if report:
+                f.write(report)
+                print('Wrote out report to {}'.format(args.output))
+    elif cmd == 'spider':
         if args.url:
             if args.add_to_scope:
                 if not client.target_in_scope(args.url):
                     client.add_target_to_scope(args.url)
             for url in args.url:
                 print(client.spider(url))
-    if cmd == 'scan':
         if args.status:
-            print(client.scan_status())
+            print(client.spider_status())
+    elif cmd == 'scan':
         if args.url:
-            for url in args.url:
-                if args.add_to_scope:
-                    if not client.target_in_scope(url):
-                        client.add_target_to_scope(url)
-                if not args.passive:
-                    print(client.scan_active(url))
+            url = args.url
+            if args.add_to_scope:
+                if not client.target_in_scope(url):
+                    print(client.add_target_to_scope(url))
+            if not args.passive:
+                print(client.scan_active(url))
+        if args.status:
+            completed = False
+            while not completed:
+                msg, completed = client.scan_status()
+                print('{}'.format(msg), end='\r')
+                time.sleep(1)
+            print()
