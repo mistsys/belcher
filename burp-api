@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import argparse
-import os
+import urllib.parse
 
 import requests
 
@@ -9,26 +9,18 @@ DEFAULT_BASE = 'http://localhost:8090/'
 PATHS = {  # {{{
     'config': "/burp/configuration",
     'history': "/burp/proxy/history",
-    'report': "/burp/report",
     'issues': "/burp/scanner/issues",
+    'report': "/burp/report",
     'spider': "/burp/spider",
+    'scan-active': "/burp/scanner/scans/active",
+    'scan-status': "/burp/scanner/status",
+    'spider-status': "/burp/spider/status",
     'stop': "/burp/stop",
-    # '': "/burp/scanner/scans/active",
+    'target': "/burp/target/scope",
     # '': "/burp/scanner/scans/passive",
-    # '': "/burp/scanner/status",
-    # '': "/burp/spider/status",
-    # '': "/burp/target/scope",
     # '': "/burp/target/sitemap",
     # '': "/burp/versions" ,
 }  # }}}
-
-
-def _quietly_load_resp_json(resp):
-    '''Return the dict from deserialization or None if failed'''
-    try:
-        return resp.json()
-    except Exception:
-        pass  # None if failed
 
 
 class BurpClient:
@@ -39,40 +31,139 @@ class BurpClient:
         self.base_url = base_url
 
     def _resource_url(self, action):
-        return os.path.join(self.base_url, PATHS[action])
+        return urllib.parse.urljoin(self.base_url, PATHS[action])
 
-    def spider(self, url):
+    def target_in_scope(self, target):
+        url = self._resource_url('target')
+        params = {'url': target}
+        resp = requests.get(url, params=params)
+        if not resp.ok:
+            print('i clearly don\'t know how to handle errors. target-in-scope failed')
+            return False
+        try:
+            data = resp.json()
+            return data['inScope']
+        except Exception:
+            return 'Failed to parse response data: {}'.format(resp.text)
+
+    def add_target_to_scope(self, target):
+        url = self._resource_url('target')
+        data = {'url': target}
+        resp = requests.put(url, data=data)
+        if resp.ok:
+            print('Added {} to scope'.format(target))
+        else:
+            print('Failed to add {} to scope'.format(target))
+
+    def spider(self, target):
         '''Send a seed URL to the Burp spider (which queues it for spidering)'''
         url = self._resource_url('spider')
         data = {
-            'baseUrl': url
+            'baseUrl': target
         }
         resp = requests.post(url, data=data)
         if resp.ok:
-            print('Sent {} to be spidered.'.format(url))
+            return 'Sent {} to be spidered.'.format(url)
         else:
-            print('Failed.')
+            return 'Failed to send URL! Status {}, {}'.format(resp.status_code, resp.text)
+
+    def spider_status(self):
+        url = self._resource_url('spider-status')
+        resp = requests.get(url)
+        if not resp.ok:
+            return 'Failed to get status! Status {}, {}'.format(resp.status_code, resp.text)
+        try:
+            data = resp.json()
+            return 'Spider percentage: {}'.format(data['spiderPercentage'])
+        except Exception:
+            return 'Failed to parse response data: {}'.format(resp.text)
+
+    def scan_active(self, target):
+        url = self._resource_url('scan-active')
+        resp = requests.post(url, data={'baseUrl': target})
+        if not resp.ok:
+            return 'Failed start scan! Status {}, {}'.format(resp.status_code, resp.text)
+        return 'Started active scan on {}'.format(target)
+
+    def scan_status(self):
+        url = self._resource_url('scan-status')
+        resp = requests.get(url)
+        if not resp.ok:
+            return 'Failed to get status! Status {}, {}'.format(resp.status_code, resp.text)
+        try:
+            data = resp.json()
+            return 'Scan percentage: {}'.format(data['scanPercentage'])
+        except Exception:
+            return 'Failed to parse response data: {}'.format(resp.text)
 
     def stop(self):
         '''Stop Burp. Per the docs, this *fully stops* the burp process.'''
         url = self._resource_url('stop')
         resp = requests.get(url)
         if not resp.ok:
-            print('Failed.')
-            print(resp.text)
+            return 'Failed to stop Burp! {}'.format(resp.text)
         else:
-            print('Successfully stopped Burp.')
-
-
-def spider_parser(client):
-    root = argparse.ArgumentParser(description='Subcommands for the Burp spider')
-    root.add_argument('-u', '--send', help='Send a URL to the spider queue',
-                      metavar='URL1 URL2 ...', type=str, nargs='+')
+            return 'Successfully stopped Burp.'
 
 
 if __name__ == '__main__':
-    base_url = os.getenv('BURP_BASE_URL', DEFAULT_BASE)
+    root_parser = argparse.ArgumentParser(description='CLI for Burp Rest API')
+    root_parser.add_argument('-b', '--base', help='Base Burp daemon URL',
+                             metavar='url', type=str, default='')
+    subparsers = root_parser.add_subparsers()
+
+    spider = subparsers.add_parser('spider', help='Subcommands for the Burp spider')
+    spider.set_defaults(cmd='spider')  # stupid hack to keep a record of the subcommand used
+    # this can be changed to use choices and just positional args instead of flags
+    spider.add_argument('-u', '--url', help='Send a URL to the spider queue',
+                        metavar='url', type=str, nargs='+')
+    spider.add_argument('-s', '--status', help='Get the current spider status',
+                        action='store_true')
+    spider.add_argument('-a', '--add-to-scope', help='Add the URL to the scope if it isn\'t in scope already',
+                        action='store_true')
+
+    scan = subparsers.add_parser('scan', help='Subcommands for the Burp active scanner')
+    scan.set_defaults(cmd='scan')
+    scan.add_argument('-u', '--url', help='Target URL',
+                      metavar='url', type=str, nargs='?')
+    scan.add_argument('-a', '--add-to-scope', help='Add the URL to the scope if it isn\'t in scope already',
+                      action='store_true', default=True)
+    scan.add_argument('-p', '--passive', help='Do a passive scan',
+                      action='store_true')
+    scan.add_argument('-s', '--status', help='Get the current scanner status',
+                      action='store_true')
+
+    stop = subparsers.add_parser('stop', help='Stop the Burp daemon')
+    stop.set_defaults(cmd='stop')
+
+    args = root_parser.parse_args()
+    args_dict = vars(args)
+    # print(args)
+
+    cmd = args.cmd or ''
+
+    # time to actually do stuff
+    base_url = args.base or DEFAULT_BASE
     client = BurpClient(base_url)
 
-    parser = argparse.ArgumentParser(description='CLI for Burp Rest API')
-    parser.add_subparsers(spider_parser(client))
+    if cmd == 'stop':
+        print(client.stop())
+    if cmd == 'spider':
+        if args.status:
+            print(client.spider_status())
+        if args.url:
+            if args.add_to_scope:
+                if not client.target_in_scope(args.url):
+                    client.add_target_to_scope(args.url)
+            for url in args.url:
+                print(client.spider(url))
+    if cmd == 'scan':
+        if args.status:
+            print(client.scan_status())
+        if args.url:
+            for url in args.url:
+                if args.add_to_scope:
+                    if not client.target_in_scope(url):
+                        client.add_target_to_scope(url)
+                if not args.passive:
+                    print(client.scan_active(url))
