@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+import argparse
+import os
+
+import requests
+
+
+DEFAULT_BASE = 'http://localhost:8090/'
+PATHS = {  # {{{
+    'config': "/burp/configuration",
+    'history': "/burp/proxy/history",
+    'report': "/burp/report",
+    'issues': "/burp/scanner/issues",
+    'spider': "/burp/spider",
+    'stop': "/burp/stop",
+    # '': "/burp/scanner/scans/active",
+    # '': "/burp/scanner/scans/passive",
+    # '': "/burp/scanner/status",
+    # '': "/burp/spider/status",
+    # '': "/burp/target/scope",
+    # '': "/burp/target/sitemap",
+    # '': "/burp/versions" ,
+}  # }}}
+
+
+def _quietly_load_resp_json(resp):
+    '''Return the dict from deserialization or None if failed'''
+    try:
+        return resp.json()
+    except Exception:
+        pass  # None if failed
+
+
+class BurpClient:
+    def __init__(self, base_url=''):
+        '''paths should be a dictionary of action:path'''
+        if not base_url:
+            raise Exception('Missing base url')
+        self.base_url = base_url
+
+    def _resource_url(self, action):
+        return os.path.join(self.base_url, PATHS[action])
+
+    def spider(self, url):
+        '''Send a seed URL to the Burp spider (which queues it for spidering)'''
+        url = self._resource_url('spider')
+        data = {
+            'baseUrl': url
+        }
+        resp = requests.post(url, data=data)
+        if resp.ok:
+            print('Sent {} to be spidered.'.format(url))
+        else:
+            print('Failed.')
+
+    def stop(self):
+        '''Stop Burp. Per the docs, this *fully stops* the burp process.'''
+        url = self._resource_url('stop')
+        resp = requests.get(url)
+        if not resp.ok:
+            print('Failed.')
+            print(resp.text)
+        else:
+            print('Successfully stopped Burp.')
+
+
+def spider_parser(client):
+    root = argparse.ArgumentParser(description='Subcommands for the Burp spider')
+    root.add_argument('-u', '--send', help='Send a URL to the spider queue',
+                      metavar='URL1 URL2 ...', type=str, nargs='+')
+
+
+if __name__ == '__main__':
+    base_url = os.getenv('BURP_BASE_URL', DEFAULT_BASE)
+    client = BurpClient(base_url)
+
+    parser = argparse.ArgumentParser(description='CLI for Burp Rest API')
+    parser.add_subparsers(spider_parser(client))
