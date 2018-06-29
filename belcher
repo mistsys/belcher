@@ -211,9 +211,11 @@ def spider_cmd(client, args):
         urls = args.url or []
 
     for url in urls:
+        print_stderr(client.target_add(url))
+    for url in urls:
         # if args.add_to_scope:
-        client.target_add(url)
         print_stderr(client.spider(url))
+
     if args.status:
         _wait_print_status(client.spider_status)
 
@@ -224,14 +226,14 @@ def scan_cmd(client, args):
     else:
         urls = args.url or []
 
+    spider_cmd(client, args)  # not good
+
     for url in urls:
-        # if args.add_to_scope:
-        print_stderr(client.target_add(url))
-        spider_cmd(client, args)  # lol
         if args.passive:
             print_stderr(client.scan_passive(url))
         else:
             print_stderr(client.scan_active(url))
+
     if args.status:
         _wait_print_status(client.scan_status)
 
@@ -255,7 +257,7 @@ def sitemap_cmd(client, args):
 
 
 def stop_cmd(client, args):
-    if args.stop_all:
+    if args.shutdown:
         print_stderr(client.stop())
     else:
         print_stderr(client.scan_stop())
@@ -279,7 +281,7 @@ if __name__ == '__main__':
 
     scan = subparsers.add_parser('scan', help='Subcommands for the Burp active scanner')
     scan.add_argument('-u', '--url', help='Target URL', metavar='url', type=str, nargs='*')
-    scan.add_argument('-p', '--passive', help='Do a passive scan', action='store_true')
+    scan.add_argument('-p', '--passive', help='Do a passive scan', action='store_true', default=False)
     scan.add_argument('-t', '--target-file', help='YAML file of urls to scan', metavar='base', type=str, default='')
     scan.add_argument('-s', '--spider', help='Spider the targets', action='store_true', default=False)
     scan.add_argument('--status', help='Get the current scanner status', action='store_true', default=False)

@@ -1,13 +1,14 @@
-### Burp REST API CLI
-Command Line Interface for the [burp-rest-api](https://github.com/vmware/burp-rest-api).
+## Burp REST API CLI
+Command Line Interface for the [burp-rest-api][burp-rest-api].
 
-Requires `requests`.
-
+## Usage
+###
+Start [burp-rest-api][burp-rest-api]. Then,
 ```
-thomaslu|~/s/belcher $ belcher
+tlumist|~/s/belcher $ belcher
 usage: belcher [-h] [-b base] {spider,scan,issues,report,sitemap,stop} ...
 
-CLI for Burp Rest API
+CLI for the Burp Rest API
 
 positional arguments:
   {spider,scan,issues,report,sitemap,stop}
