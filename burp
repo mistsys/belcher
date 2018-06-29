@@ -256,67 +256,64 @@ def sitemap_cmd(client, args):
 
 def stop_cmd(client, args):
     if args.stop_all:
-        print(client.stop())
+        print_stderr(client.stop())
     else:
-        print(client.scan_stop())
+        print_stderr(client.scan_stop())
 
 
 if __name__ == '__main__':
     root = argparse.ArgumentParser(description='CLI for Burp Rest API')
-    root.set_defaults(cmd='')  # stupid hack to keep a record of the subcommand used
-    root.add_argument('-b', '--base', help='Base Burp daemon URL',
-                      metavar='base', type=str, default='')
+    root.add_argument('-b', '--base', help='Base Burp daemon URL', metavar='base', type=str, default='')
+
+    # lets us make subcommands
     subparsers = root.add_subparsers()
 
     spider = subparsers.add_parser('spider', help='Subcommands for the Burp spider')
-    spider.set_defaults(cmd='spider')  # stupid hack to keep a record of the subcommand used
 
-    # all subcommands can be changed to use choices and positional args instead of flags (for some options)
     spider.add_argument('-u', '--url', help='Send a URL to the spider queue',
                         metavar='url', type=str, nargs='*')
     spider.add_argument('-s', '--status', help='Get the current spider status',
                         action='store_true')
-    # spider.add_argument('-a', '--add-to-scope', help='Add the URL to the scope if it isn\'t in scope already',
-    #                     action='store_true', default=False)
+    spider.add_argument('-t', '--target-file', help='YAML file of urls to spider',
+                        metavar='base', type=str, default='')
 
     scan = subparsers.add_parser('scan', help='Subcommands for the Burp active scanner')
-    scan.set_defaults(cmd='scan')  # stupid hack to keep a record of the subcommand used
-    scan.add_argument('-u', '--url', help='Target URL',
-                      metavar='url', type=str, nargs='*')
-    # scan.add_argument('-a', '--add-to-scope', help='Add the URL to the scope if it isn\'t in scope already',
-    #                   action='store_true', default=True)
-    scan.add_argument('-p', '--passive', help='Do a passive scan',
-                      action='store_true')
-    scan.add_argument('-s', '--status', help='Get the current scanner status',
-                      action='store_true')
-    scan.add_argument('-t', '--target-file', help='YAML file of urls to scan',
-                      metavar='base', type=str, default='')
+    scan.add_argument('-u', '--url', help='Target URL', metavar='url', type=str, nargs='*')
+    scan.add_argument('-p', '--passive', help='Do a passive scan', action='store_true')
+    scan.add_argument('-t', '--target-file', help='YAML file of urls to scan', metavar='base', type=str, default='')
+    scan.add_argument('-s', '--spider', help='Spider the targets', action='store_true', default=False)
+    scan.add_argument('--status', help='Get the current scanner status', action='store_true', default=False)
 
     issues = subparsers.add_parser('issues', help='Get the found issues')
-    issues.set_defaults(cmd='issues')  # stupid hack to keep a record of the subcommand used
-    issues.add_argument('-u', '--url', help='Target URL',
-                        metavar='url', type=str, default='')
-    issues.add_argument('-o', '--output-file', help='Output file',
-                        type=str)
+    issues.add_argument('-u', '--url', help='Target URL', metavar='url', type=str, default='')
+    issues.add_argument('-o', '--output-file', help='Output file', type=str)
 
     report = subparsers.add_parser('report', help='Get the scan report')
-    report.set_defaults(cmd='report')  # stupid hack to keep a record of the subcommand used
-    report.add_argument('-o', '--output-file', help='Output file',
-                        type=str)
+    report.add_argument('-o', '--output-file', help='Output file', type=str)
 
     sitemap = subparsers.add_parser('sitemap', help='Get the current sitemap')
-    sitemap.set_defaults(cmd='sitemap')  # stupid hack to keep a record of the subcommand used
-    sitemap.add_argument('-u', '--url', help='Target URL',
-                         metavar='url', type=str, default='')
-    sitemap.add_argument('-o', '--output-file', help='Output file',
-                         type=str)
+    sitemap.add_argument('-u', '--url', help='Target URL', metavar='url', type=str, default='')
+    sitemap.add_argument('-o', '--output-file', help='Output file', type=str)
 
     stop = subparsers.add_parser('stop', help='Stop various Burp processes (default stops scans)')
-    stop.set_defaults(cmd='stop')  # stupid hack to keep a record of the subcommand used
-    stop.add_argument('-a', '--stop-all', help='Stop the Burp daemon',
-                      action='store_true', default=False)
-    stop.add_argument('-s', '--stop-scans', help='Stop the active scan (default)',
-                      action='store_true', default=True)  # unused
+    stop.add_argument('--shutdown', help='Stop the Burp daemon', action='store_true', default=False)
+    # stop-scans unused
+    stop.add_argument('-s', '--stop-scans', help='Stop the active scan (default)', action='store_true', default=True)
+
+    # I think these should just be implied
+    # spider.add_argument('-a', '--add-to-scope', help='Add the URL to the scope if it isn\'t in scope already',
+    #                     action='store_true', default=False)
+    # scan.add_argument('-a', '--add-to-scope', help='Add the URL to the scope if it isn\'t in scope already',
+    #                   action='store_true', default=True)
+
+    # stupid hack to keep a record of the subcommand used
+    root.set_defaults(cmd='')
+    spider.set_defaults(cmd='spider')
+    scan.set_defaults(cmd='scan')
+    issues.set_defaults(cmd='issues')
+    report.set_defaults(cmd='report')
+    sitemap.set_defaults(cmd='sitemap')
+    stop.set_defaults(cmd='stop')
 
     args = root.parse_args()
 
