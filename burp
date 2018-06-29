@@ -28,6 +28,10 @@ PATHS = {
 }
 
 
+def print_stderr(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
+
 # TODO so all this stuff should raise exceptions instead of printing/returning errors
 class BurpClient:
     def __init__(self, base_url=''):
@@ -44,7 +48,7 @@ class BurpClient:
         params = {'url': target}
         resp = requests.get(url, params=params)
         if not resp.ok:
-            print('i clearly don\'t know how to handle errors. target-in-scope failed')
+            print_stderr('i clearly don\'t know how to handle errors. target-in-scope failed')
             return False
         try:
             data = resp.json()
@@ -156,7 +160,7 @@ class BurpClient:
         url = self._resource_url('report')
         resp = requests.get(url)
         if not resp.ok:
-            print('Failed to get status! Status {}, {}'.format(resp.status_code, resp.text))
+            print_stderr('Failed to get status! Status {}, {}'.format(resp.status_code, resp.text))
             return
         return resp.text
 
@@ -182,16 +186,14 @@ def _wait_print_status(f):
     f should return a msg and a bool status, True for done, False for not'''
     completed = False
     try:
-        start = datetime.datetime.now()
         while not completed:
             msg, completed = f()
-            print('{}'.format(msg), end='\r')
+            print_stderr('{}'.format(msg), end='\r')
             time.sleep(1)
-        print()
-        print('Done in {}'.format(datetime.datetime.now() - start))
+        print_stderr()
     except KeyboardInterrupt:
-        print()
-        print('Caught keyboard interrupt. Note that the job may still be running!')
+        print_stderr()
+        print_stderr('Caught keyboard interrupt. Note that the job may still be running!')
 
 
 def report_cmd(client, args):
@@ -199,7 +201,7 @@ def report_cmd(client, args):
         report = client.report()
         if report:
             f.write(report)
-            print('Wrote out report to {}'.format(args.output_file))
+            print_stderr('Wrote out report to {}'.format(args.output_file))
 
 
 def spider_cmd(client, args):
@@ -211,7 +213,7 @@ def spider_cmd(client, args):
     for url in urls:
         # if args.add_to_scope:
         client.target_add(url)
-        print(client.spider(url))
+        print_stderr(client.spider(url))
     if args.status:
         _wait_print_status(client.spider_status)
 
@@ -224,12 +226,12 @@ def scan_cmd(client, args):
 
     for url in urls:
         # if args.add_to_scope:
-        print(client.target_add(url))
+        print_stderr(client.target_add(url))
         spider_cmd(client, args)  # lol
         if args.passive:
-            print(client.scan_passive(url))
+            print_stderr(client.scan_passive(url))
         else:
-            print(client.scan_active(url))
+            print_stderr(client.scan_active(url))
     if args.status:
         _wait_print_status(client.scan_status)
 
@@ -333,10 +335,12 @@ if __name__ == '__main__':
     }
 
     try:
+        start = datetime.datetime.now()
         cmd = COMMANDS[args.cmd]
         cmd(client, args)
+        print_stderr('Done in {}'.format(datetime.datetime.now() - start))
     except KeyError:
         root.print_help()
     except requests.exceptions.ConnectionError as e:
-        print('Couldn\'t connect to the Burp daemon at {}.\n'
-              'Is it running?'.format(base_url))
+        print_stderr('Couldn\'t connect to the Burp daemon at {}.\n'
+                     'Is it running?'.format(base_url))
