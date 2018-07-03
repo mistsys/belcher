@@ -274,16 +274,16 @@ if __name__ == '__main__':
 
     spider.add_argument('-u', '--url', help='Send a URL to the spider queue',
                         metavar='url', type=str, nargs='*')
-    spider.add_argument('-s', '--status', help='Get the current spider status',
-                        action='store_true')
     spider.add_argument('-t', '--target-file', help='YAML file of urls to spider',
                         metavar='base', type=str, default='')
+    spider.add_argument('--status', help='Get the current spider status',
+                        action='store_true')
 
     scan = subparsers.add_parser('scan', help='Subcommands for the Burp active scanner')
     scan.add_argument('-u', '--url', help='Target URL', metavar='url', type=str, nargs='*')
     scan.add_argument('-p', '--passive', help='Do a passive scan', action='store_true', default=False)
     scan.add_argument('-t', '--target-file', help='YAML file of urls to scan', metavar='base', type=str, default='')
-    scan.add_argument('-s', '--spider', help='Spider the targets', action='store_true', default=False)
+    scan.add_argument('--spider', help='Spider the targets', action='store_true', default=False)
     scan.add_argument('--status', help='Get the current scanner status', action='store_true', default=False)
 
     issues = subparsers.add_parser('issues', help='Get the found issues')
