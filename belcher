@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import argparse
-import datetime
+# import datetime
 # import json
 import sys
 import time
@@ -28,16 +28,23 @@ PATHS = {
 }
 
 
-def print_stderr(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
+class BurpAPIError(Exception):
+    pass
 
 
-# TODO so all this stuff should raise exceptions instead of printing/returning errors
+def _get_error(response):
+    '''Try to jsonify the response object and get the failure message;
+    generic error message on failure.'''
+    try:
+        return response.json()['message']
+    except Exception:
+        return 'API error: ' + response.text
+
+
 class BurpClient:
     def __init__(self, base_url=''):
-        '''paths should be a dictionary of action:path'''
         if not base_url:
-            raise Exception('Missing base url')
+            raise BurpAPIError('Missing base url')
         self.base_url = base_url
 
     def _resource_url(self, action):
@@ -48,36 +55,31 @@ class BurpClient:
         params = {'url': target}
         resp = requests.get(url, params=params)
         if not resp.ok:
-            print_stderr('i clearly don\'t know how to handle errors. target-in-scope failed')
-            return False
+            raise BurpAPIError(_get_error(resp))
         try:
             data = resp.json()
             return data['inScope']
         except Exception:
-            return 'Failed to parse response data: {}'.format(resp.text)
+            raise BurpAPIError('Failed to parse response data: {}'.format(resp.text))
 
     def target_add(self, target):
         url = self._resource_url('target')
         data = {'url': target}
         resp = requests.put(url, data=data)
-        if resp.ok:
-            return 'Added {} to scope'.format(target)
-        else:
-            return 'Failed to add {} to scope'.format(target)
+        if not resp.ok:
+            raise BurpAPIError(_get_error(resp))
 
-    # TODO add like, filtering or something (either here or in cli/app code) so you
-    # can do things like... emit errors or whatever when you find an issue
     def issues(self, base=''):
         '''Return found issues as a dict. Provide base if you want the issues for only a
         specific prefix.'''
         url = self._resource_url('issues')
         resp = requests.get(url, params={'urlPrefix': base})
         if not resp.ok:
-            raise Exception
+            raise BurpAPIError(_get_error(resp))
         try:
-            return resp.json()  # ensure that it's actually JSON
+            return resp.json()
         except Exception:
-            return 'Failed to parse response data: {}'.format(resp.text)
+            raise BurpAPIError('Failed to parse response data: {}'.format(resp.text))
 
     def spider(self, target):
         '''Send a seed URL to the Burp spider (which queues it for spidering)'''
@@ -86,26 +88,20 @@ class BurpClient:
             'baseUrl': target
         }
         resp = requests.post(url, data=data)
-        if resp.ok:
-            return 'Sent {} to be spidered.'.format(target)
-        else:
-            return 'Failed to send URL! Status {}, {}'.format(resp.status_code, resp.text)
+        if not resp.ok:
+            raise BurpAPIError(_get_error(resp))
 
     def spider_status(self):
-        '''Returns msg and True/False for done/not done'''
+        '''Return percentage as an int'''
         url = self._resource_url('spider-status')
         resp = requests.get(url)
         if not resp.ok:
-            return (
-                'Failed to get status! Status {}, {}'.format(resp.status_code, resp.text),
-                False
-            )
+            raise BurpAPIError(_get_error(resp))
         try:
             data = resp.json()
-            perc = data['spiderPercentage']
-            return 'Spider percentage: {}'.format(perc), perc == 100
+            return int(data['spiderPercentage'])
         except Exception:
-            return 'Failed to parse response data: {}'.format(resp.text), False
+            raise BurpAPIError('Failed to parse response data: {}'.format(resp.text))
 
     def sitemap(self, base=''):
         '''Return the sitemap as a dict. Provide base if you want the map for only a
@@ -113,87 +109,89 @@ class BurpClient:
         url = self._resource_url('sitemap')
         resp = requests.get(url, params={'urlPrefix': base})
         if not resp.ok:
-            return 'Failed to get sitemap! Status {}, {}'.format(resp.status_code, resp.text),
+            raise BurpAPIError(_get_error(resp))
         try:
-            return resp.json()  # ensure that it's actually JSON
+            return resp.json()
         except Exception:
-            return 'Failed to parse response data: {}'.format(resp.text)
+            raise BurpAPIError('Failed to parse response data: {}'.format(resp.text))
 
     def scan_active(self, target):
         url = self._resource_url('scan-active')
         resp = requests.post(url, data={'baseUrl': target})
         if not resp.ok:
-            return 'Failed start scan! Status {}, {}'.format(resp.status_code, resp.text)
-        return 'Started active scan on {}'.format(target)
+            raise BurpAPIError(_get_error(resp))
 
     def scan_passive(self, target):
         url = self._resource_url('scan-passive')
         resp = requests.post(url, data={'baseUrl': target})
         if not resp.ok:
-            return 'Failed start scan! Status {}, {}'.format(resp.status_code, resp.text)
-        return 'Started passive scan on {}'.format(target)
+            raise BurpAPIError(_get_error(resp))
 
     def scan_status(self):
-        '''Returns text and True/False for done/not done'''
+        '''Return percentage as an int'''
         url = self._resource_url('scan-status')
         resp = requests.get(url)
         if not resp.ok:
-            return (
-                'Failed to get status! Status {}, {}'.format(resp.status_code, resp.text),
-                False
-            )
+            raise BurpAPIError(_get_error(resp))
         try:
             data = resp.json()
-            perc = data['scanPercentage']
-            return 'Scan percentage: {}'.format(perc), perc == 100
+            return int(data['scanPercentage'])
         except Exception:
-            return 'Failed to parse response data: {}'.format(resp.text), False
+            raise BurpAPIError('Failed to parse response data: {}'.format(resp.text))
 
     def scan_stop(self):
-        url = self._resource_url('scan-active')  # same endpoint
+        url = self._resource_url('scan-active')  # same endpoint, different method
         resp = requests.delete(url)
         if not resp.ok:
-            return 'Failed to stop scan! Status {}, {}'.format(resp.status_code, resp.text)
-        return 'Successfully stopped scan.'
+            raise BurpAPIError(_get_error(resp))
 
     def report(self):
         url = self._resource_url('report')
         resp = requests.get(url)
         if not resp.ok:
-            print_stderr('Failed to get status! Status {}, {}'.format(resp.status_code, resp.text))
-            return
+            raise BurpAPIError(_get_error(resp))
         return resp.text
 
     def stop(self):
-        '''Stop Burp. Per the docs, this *fully stops* the burp process.'''
+        '''Stop Burp. This *fully stops* the burp process.'''
         url = self._resource_url('stop')
         resp = requests.get(url)
         if not resp.ok:
-            return 'Failed to stop Burp! {}'.format(resp.text)
-        return 'Successfully stopped Burp.'
+            raise BurpAPIError(_get_error(resp))
+
+    def _add_to_sitemap(self, url):
+        '''A Burp scan seems to only work if the target URL is
+        - in scope
+        - AND in the sitemap
+
+        There's a direct way to add to scope, but adding to the sitemap requires
+        spidering. So here's adding to the sitemap :eyeroll:'''
+        self.target_add(url)
+        self.spider(url)
 
 
 def _yaml_to_urls(fname):
     with open(fname, 'r') as f:
-        # unhandled exception :)
+        # unhandled exception: key error, whatever the yaml load errors can be
         return yaml.load(f)['paths']
 
 
-def _wait_print_status(f):
+def _wait_status(f, msg='Status', should_print=True):
     '''call the fn wait til it returns true... but it's obviously intended for the
-    client lel idc
+    client lel idc. f should return an int in [0,100]
 
     f should return a msg and a bool status, True for done, False for not'''
-    completed = False
+    percentage = 0
     try:
-        while not completed:
-            msg, completed = f()
-            print_stderr('{}'.format(msg), end='\r')
+        while percentage < 100:
+            percentage = f()
+            if should_print:
+                print('{}: {}'.format(msg, percentage), end='\r')
             time.sleep(1)
-        print_stderr()
+        print()
     except KeyboardInterrupt:
-        print_stderr()
-        print_stderr('Caught keyboard interrupt. Note that the job may still be running!')
+        print()
+        print('Caught keyboard interrupt. Note that the job may still be running!')
 
 
 def report_cmd(client, args):
@@ -201,7 +199,7 @@ def report_cmd(client, args):
         report = client.report()
         if report:
             f.write(report)
-            print_stderr('Wrote out report to {}'.format(args.output_file))
+            print('Wrote out report to {}'.format(args.output_file))
 
 
 def spider_cmd(client, args):
@@ -211,13 +209,11 @@ def spider_cmd(client, args):
         urls = args.url or []
 
     for url in urls:
-        print_stderr(client.target_add(url))
-    for url in urls:
-        # if args.add_to_scope:
-        print_stderr(client.spider(url))
+        client._add_to_sitemap(url)
+        print('Sent {} to be spidered.'.format(url))
 
     if args.status:
-        _wait_print_status(client.spider_status)
+        _wait_status(client.spider_status)
 
 
 def scan_cmd(client, args):
@@ -226,16 +222,24 @@ def scan_cmd(client, args):
     else:
         urls = args.url or []
 
-    spider_cmd(client, args)  # not good
+    # TODO refactor
+    for url in urls:
+        # TODO check if it's in the sitemap first
+        client._add_to_sitemap(url)
+        print('Added {} to sitemap.'.format(url))
+    # TODO flag: if didn't have to add to sitemap, skip this
+    _wait_status(client.spider_status, msg='Spider status')
 
     for url in urls:
         if args.passive:
-            print_stderr(client.scan_passive(url))
+            client.scan_passive(url)
+            print('Started passive scan on {}.'.format(url))
         else:
-            print_stderr(client.scan_active(url))
+            client.scan_active(url)
+            print('Started active scan on {}.'.format(url))
 
     if args.status:
-        _wait_print_status(client.scan_status)
+        _wait_status(client.scan_status)
 
 
 def issues_cmd(client, args):
@@ -258,9 +262,11 @@ def sitemap_cmd(client, args):
 
 def stop_cmd(client, args):
     if args.shutdown:
-        print_stderr(client.stop())
+        client.stop()
+        print('Stopped Burp.')
     else:
-        print_stderr(client.scan_stop())
+        client.scan_stop()
+        print('Stopped scan.')
 
 
 if __name__ == '__main__':
@@ -334,12 +340,19 @@ if __name__ == '__main__':
     }
 
     try:
-        start = datetime.datetime.now()
+        # start = datetime.datetime.now()
         cmd = COMMANDS[args.cmd]
         cmd(client, args)
-        print_stderr('Done in {}'.format(datetime.datetime.now() - start))
+        # print('Done in {}'.format(datetime.datetime.now() - start))
+        sys.exit(0)  # because of finally at the end
     except KeyError:
         root.print_help()
+    except BurpAPIError as e:
+        print(e)
     except requests.exceptions.ConnectionError as e:
-        print_stderr('Couldn\'t connect to the Burp daemon at {}.\n'
-                     'Is it running?'.format(base_url))
+        print('Couldn\'t connect to the Burp daemon at {}.\n'
+              'Is it running?'.format(base_url))
+    except Exception as e:
+        print(e)
+    finally:
+        sys.exit(1)
