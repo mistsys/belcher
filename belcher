@@ -199,7 +199,6 @@ def report_cmd(client, args):
         report = client.report()
         if report:
             f.write(report)
-            print('Wrote out report to {}'.format(args.output_file))
 
 
 def spider_cmd(client, args):

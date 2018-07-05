@@ -24,23 +24,21 @@ optional arguments:
   -b base, --base base  Base Burp daemon URL
 ```
 
+E.g.
 ```
-(burp) tlumist|~/s/belcher $ belcher scan --target-file example-paths.yaml --status
-Added http://localhost:8000/shell-injection to scope
-Added http://localhost:8000/shell-injection3 to scope
-Added http://localhost:8000/injection1 to scope
-Added http://localhost:8000/injection3 to scope
-Sent http://localhost:8000/shell-injection to be spidered.
-Sent http://localhost:8000/shell-injection3 to be spidered.
-Sent http://localhost:8000/injection1 to be spidered.
-Sent http://localhost:8000/injection3 to be spidered.
-Spider percentage: 100
-Started active scan on http://localhost:8000/shell-injection
-Started active scan on http://localhost:8000/shell-injection3
-Started active scan on http://localhost:8000/injection1
-Started active scan on http://localhost:8000/injection3
-Scan percentage: 100
-Done in 0:00:52.592814
+tlumist|~/s/belcher $ belcher scan --status -t example-paths.yaml
+Added http://localhost:8000/shell-injection to sitemap.
+Added http://localhost:8000/shell-injection3 to sitemap.
+Added http://localhost:8000/injection1 to sitemap.
+Added http://localhost:8000/injection3 to sitemap.
+Spider status: 100
+Started active scan on http://localhost:8000/shell-injection.
+Started active scan on http://localhost:8000/shell-injection3.
+Started active scan on http://localhost:8000/injection1.
+Started active scan on http://localhost:8000/injection3.
+Status: 100
+
+tlumist|~/s/belcher $ belcher issues -o issues.yml  # spit found issues into a YAML doc
 ```
 
 ### Building burp-rest-api
@@ -87,5 +85,29 @@ Gradle 2.13 doesn't work with `Java >=1.9`, which is just as well, since the cur
 Burp version at this time isn't tested for `Java >=1.8`. Downgrade to `Java < 1.9`,
 and it should work. (Burp will emit a warning for `Java >= 1.8`, but `1.8.0` has worked just
 fine for me so far)
+
+### Future Work
+Baking [burp-rest-api][burp-rest-api] into a Docker container would make it more convenient
+for testing, but it's hard to build in the container. The reason is actually pretty simple:
+Burp Pro looks in the default Java store location for the license key; if it doesn't find
+the key and you're running in headless mode, it'll prompt you to accept the EULA and paste
+in your key. So now there are two problems:
+ - the gradle build doesn't allow you to accept the EULA/paste the key. Technically an easy
+   fix--just add this to build.gradle `standardInput = System.in` in `bootRun`. I don't
+   recommend this at the moment because...
+ - ...that means you have to activate Burp in the container. And then what?
+   - You obviously can't activate every time you run/build, since you'd hit the activation
+     limit.
+   - You shouldn't commit the license to the image, though that would actually work.
+   - What's left is maybe mounting the Java preference store directory as a volume, which
+     seems really messy.
+
+So for now, my recommendation is to build the jar and run it bare.
+ - In fairness, you have to provide the license key if you run the plain jar anyway,
+   so the latter two solutions aren't *worse* than my present recommendation **if you use
+   this in a CI pipeline**.
+
+FWIW: You can build with Burp CE too. The build will fail on the test phase, but it'll run
+perfectly fine--you just won't have any of the automated testing features.
 
 [burp-rest-api]: https://github.com/vmware/burp-rest-api
