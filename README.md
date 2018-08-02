@@ -44,6 +44,29 @@ tlumist|~/s/belcher $ belcher issues -o issues.yml  # spit found issues into a Y
 ### Building burp-rest-api
 Follow the docs at [burp-rest-api][burp-rest-api]. You may run into a few problems:
 
+### SDKMAN instructions
+
+burp-rest-api only seems to work with Java 8 as of now, so you may want to use sdk to install and setup older version of java
+
+You can list the versions using `sdk list java`
+
+```
+sdk use java 8.0.181-oracle 
+```
+
+Then use gradle 2.13
+
+```
+sdk use gradle 2.13
+```
+
+copy the burp_pro.jar in the burp-rest-api/lib directory and run
+
+```
+gradle wrapper
+```
+
+
 #### Problem
 You run `gradle wrapper`. The build fails with this error
 ```
