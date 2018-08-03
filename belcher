@@ -270,7 +270,7 @@ def stop_cmd(client, args):
 
 if __name__ == '__main__':
     root = argparse.ArgumentParser(description='CLI for Burp Rest API')
-    root.add_argument('-b', '--base', help='Base Burp daemon URL', metavar='base', type=str, default='')
+    root.add_argument('-b', '--base', help='Base Burp server URL', metavar='base', type=str, default='')
 
     # lets us make subcommands
     subparsers = root.add_subparsers()
@@ -296,14 +296,14 @@ if __name__ == '__main__':
     issues.add_argument('-o', '--output-file', help='Output file', type=str)
 
     report = subparsers.add_parser('report', help='Get the scan report')
-    report.add_argument('-o', '--output-file', help='Output file', type=str)
+    report.add_argument('-o', '--output-file', help='Output file', type=str, required=True)
 
     sitemap = subparsers.add_parser('sitemap', help='Get the current sitemap')
     sitemap.add_argument('-u', '--url', help='Target URL', metavar='url', type=str, default='')
     sitemap.add_argument('-o', '--output-file', help='Output file', type=str)
 
     stop = subparsers.add_parser('stop', help='Stop various Burp processes (default stops scans)')
-    stop.add_argument('--shutdown', help='Stop the Burp daemon', action='store_true', default=False)
+    stop.add_argument('--shutdown', help='Stop the Burp server', action='store_true', default=False)
     # stop-scans unused
     stop.add_argument('-s', '--stop-scans', help='Stop the active scan (default)', action='store_true', default=True)
 
@@ -348,8 +348,8 @@ if __name__ == '__main__':
         root.print_help()
     except BurpAPIError as e:
         print(e)
-    except requests.exceptions.ConnectionError as e:
-        print('Couldn\'t connect to the Burp daemon at {}.\n'
+    except requests.exceptions.ConnectionError:
+        print('Couldn\'t connect to the Burp server at {}.\n'
               'Is it running?'.format(base_url))
     except Exception as e:
         print(e)

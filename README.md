@@ -21,7 +21,7 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -b base, --base base  Base Burp daemon URL
+  -b base, --base base  Base Burp server URL
 ```
 
 E.g.
